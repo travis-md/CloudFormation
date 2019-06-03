@@ -1,0 +1,85 @@
+Parameters:
+  NameOfService:
+    Description: "The name of the service this stack is to be used for"
+    Type: String # Type always required attribute of Parameters. Can accept: String, Number, List<Number>, CommaDelimitedList, AWS-specific Types (AWS::EC2::Image::ID), Systems Manager Parameter types
+  KeyName:
+    Description: "Name of an existing EC2 KeyPair to enable SSH access to into the server"
+    Type: AWS::EC2::KeyPair::KeyName
+Mappings:
+  RegionMap:
+      us-east-1:
+        AMI: ami-0080e4c5bc078760e # Amazon Linux AMI in N. Virginia
+      us-east-2:
+        AMI: ami-0cd3dfa4e37921605 # Amazon Linux AMI in Ohio
+      us-west-1:
+        AMI: ami-0ec6517f6edbf8044 # Amazon Linux AMI in N. California
+      eu-north-1:
+        AMI: ami-86fe70f8 # Amazon Linux AMI in Sweden
+      ap-southeast-1:
+        AMI: ami-05b3bcf7f311194b3 # Amazon Linux AMI in Singapore
+      ap-southeast-2:
+        AMI: ami-02fd0b06f06d93dfc # Amazon Linux AMI in Sydney
+Resources:
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              httpd: []
+              php: []
+          files:
+            /var/www/html/index.php:
+              content: !Sub |
+                <?php print "Hello world, Morgan is here in the Digital Stratosphere!"; ?>
+          services:
+            sysvinit:
+              httpd:
+                enabled: true
+                ensurerunnning: true
+    Properties:
+      InstanceType: t2.micro
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - AMI
+      Tags:
+        - Key: "Name"
+          Value: !Ref NameOfService
+      KeyName: !Ref KeyName
+      SecurityGroups:
+        - !Ref MySecurityGroup
+      UserData:
+        'Fn::Base64':
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y
+            # Ensure AWS CFN Bootstrap is the latest
+            yum install -y aws-cfn-boostrap
+            # Install the files and packages from the metadata
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+Outputs:
+  ServerIp:
+    Description:
+      The Server IP Address
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicIp
+  Website:
+    Description:
+      Tbe Public DNS for the EC2 Instance
+Value: !Sub 'http://${Ec2Instance.PublicDnsName}'
