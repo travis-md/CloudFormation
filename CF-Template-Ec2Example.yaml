@@ -56,7 +56,7 @@ Resources:
             #!/bin/bash -xe
             yum update -y
             # Ensure AWS CFN Bootstrap is the latest
-            yum install -y aws-cfn-boostrap
+            yum install -y aws-cfn-bootstrap
             # Install the files and packages from the metadata
             /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
   MySecurityGroup:
